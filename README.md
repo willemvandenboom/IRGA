@@ -18,4 +18,4 @@ Repository with the code used for the manuscript in preparation titled "Approxim
 
 ## Folders
 
-[Applications] and [Simulations] contain the scripts that produce the applications and simulations of the manuscript.
+[Applications](Applications) and [Simulations](Simulations) contain the scripts that produce the applications and simulations of the manuscript.
