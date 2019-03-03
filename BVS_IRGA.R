@@ -137,7 +137,9 @@ BVS_IRGA_12 <- function(
     Sigma.hat <- t(StZ)%*%StZ/(n-p)
     mean <- as.vector((diag(q)-Sigma.hat)%*%alpha.lasso)
     
-    sigma.sq <- var(StY - StZ %*% alpha.lasso)[1,1]
+    a.0 <- 1
+    b.0 <- 1
+    sigma.sq <- ( b.0+sum((StY - StZ %*% alpha.lasso)^2)/2 ) / ( a.0 + (n-p)/2 )
     
     covariance <- sigma.sq*solve(Sigma.hat)/(n-p)
     
