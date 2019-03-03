@@ -29,10 +29,13 @@ b.0 <- 1
 
 
 
-
 irgaStart <- Sys.time()
 IRGA_PIP <- PIP_IRGA(y, A, lambda, psi, sigma.sq = NULL, p = NULL)
 irgaEnd <- Sys.time()
+
+irga_lassoStart <- Sys.time()
+IRGA_lasso_PIP <- PIP_IRGA(y, A, lambda, psi, sigma.sq = NULL, p = NULL, estimator = "lasso")
+irga_lassoEnd <- Sys.time()
 
 vbStart <- Sys.time()
 VB_PIP <- PIP_VB(y, X = A, lambda, psi, sigma.sq = NULL)
@@ -51,6 +54,10 @@ Gibbs_PIP <- PIP_Gibbs(y, X = A, lambda, psi, sigma.sq = NULL, iter = 1e5, MCerr
 cat("IRGA absolute difference in posterior inclusion probability:")
 summary(abs(Gibbs_PIP - IRGA_PIP))
 print(irgaEnd - irgaStart)
+
+cat("IRGA with lasso absolute difference in posterior inclusion probability:")
+summary(abs(Gibbs_PIP - IRGA_lasso_PIP))
+print(irga_lassoEnd - irga_lassoStart)
 
 cat("VB absolute difference in posterior inclusion probability:")
 summary(abs(Gibbs_PIP - VB_PIP))

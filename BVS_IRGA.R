@@ -57,7 +57,10 @@ PIP_exact <- function(y, X, lambda, psi, Sigma) {
 
 ## Implementation of IRGA
 
-BVS_IRGA_12 <- function(y, X, Z, lambda, psi, sigma.sq = NULL, max.iter = 100, min.rho = 1, rho = 1, verbose = FALSE) {
+BVS_IRGA_12 <- function(
+  y, X, Z, lambda, psi, sigma.sq = NULL, max.iter = 100,
+  min.rho = 1, rho = 1, estimator = "VAMP", verbose = FALSE
+) {
   # Steps 1 and 2 of
   # Integrated rotated Gaussian approximation (IRGA, Algorithm 1)
   # using spike-and-slab priors as described in Section 3.1,
@@ -86,7 +89,9 @@ BVS_IRGA_12 <- function(y, X, Z, lambda, psi, sigma.sq = NULL, max.iter = 100, m
   # then the nuisance parameter eta follows its prior
   # since StZ is empty then.
   if(p == n) {
-    if(is.null(sigma.sq)) stop('sigma.sq is unknown while IRGA is called with p = n such that sigma.sq cannot be inferred.')
+    if(is.null(sigma.sq)) stop(
+      'sigma.sq is unknown while IRGA is called with p = n such that sigma.sq cannot be inferred.'
+    )
     
     # The prior variance of alpha is lambda * psi * I_q
     covariance <- lambda * psi * tcrossprod(RtZ)
@@ -101,38 +106,66 @@ BVS_IRGA_12 <- function(y, X, Z, lambda, psi, sigma.sq = NULL, max.iter = 100, m
   
   ## Step 2
   # Estimate the mean and variance of the nuisance parameter alpha
-  # using vector approximate message passing (VAMP).
+  # using vector approximate message passing (VAMP) or lasso.
   
-  # Load the function for vector approximate message passing (VAMP)
-  source('VAMP.R')
-  
-  VAMPresult <- VAMP(
-    y=StY, X=StZ, lambda, psi, sigma.sq,
-    rho = rho, max.iter = max.iter,
-    min.rho = min.rho, verbose = verbose
-  )
-  mean <- RtZ %*% VAMPresult$mean
-  covariance <- VAMPresult$variance * tcrossprod(RtZ, RtZ)
-  
-  # If sigma.sq was unknown, it has been estimated by VAMP.
-  sigma.sq <- VAMPresult$sigma.sq
+  if(estimator == "VAMP") {
+    
+    # Load the function for vector approximate message passing (VAMP)
+    source('VAMP.R')
+    
+    VAMPresult <- VAMP(
+      y=StY, X=StZ, lambda, psi, sigma.sq,
+      rho = rho, max.iter = max.iter,
+      min.rho = min.rho, verbose = verbose
+    )
+    mean <- RtZ %*% VAMPresult$mean
+    covariance <- VAMPresult$variance * tcrossprod(RtZ, RtZ)
+    
+    # If sigma.sq was unknown, it has been estimated by VAMP.
+    sigma.sq <- VAMPresult$sigma.sq
+    
+  } else {
+    
+    # Use the debiased lasso (Javanmard & Montanari, 2013)
+    q <- NCOL(StZ)
+    
+    # Keep the largest lasso estimate which has less than lambda*q+1 nonzero coefficients.
+    lars.result <- coef(lars::lars(x=StZ, y=StY, type = "lasso", intercept = FALSE))
+    alpha.lasso <- lars.result[max(which(rowSums(lars.result != 0) < lambda*q+1)),]
+    
+    lasso.u <- as.vector(alpha.lasso+t(StZ)%*%(StY-StZ%*%alpha.lasso)/(n-p))
+    Sigma.hat <- t(StZ)%*%StZ/(n-p)
+    mean <- as.vector((diag(q)-Sigma.hat)%*%alpha.lasso)
+    
+    sigma.sq <- var(StY - StZ %*% alpha.lasso)[1,1]
+    
+    covariance <- sigma.sq*solve(Sigma.hat)/(n-p)
+    
+    mean <- RtZ %*% mean
+    covariance <- tcrossprod(RtZ %*% covariance, RtZ)
+    
+  }
   
   return(list(RtY=RtY, RtX=RtX, mean=mean, covariance=covariance, sigma.sq=sigma.sq))
 }
 
 
-BVS_IRGA <- function(y, X, Z, lambda, psi, sigma.sq = NULL, max.iter = 100) {
+BVS_IRGA <- function(y, X, Z, lambda, psi, sigma.sq = NULL, max.iter = 100, estimator = "VAMP") {
   # Integrated rotated Gaussian approximation (IRGA, Algorithm 1)
   # using spike-and-slab priors as described in Section 3.1,
   # with a spike-and-slab prior on beta as well:
   # Pi(beta) = lambda * N(0, psi) + (1-lambda) delta(0) and
   # Pi(alpha) = lambda * N(0, psi) + (1-lambda) delta(0).
   # `max.iter` is the maximum number of VAMP iterations before adding dampening.
+  # `estimator` specifies whether the mean and variance of (4)
+  # are estimated using VAMP or lasso.
   
   p <- NCOL(X) # Length of beta
   
   ## Steps 1 and 2 of Algorithm 1:
-  BVS_IRGA_12result <- BVS_IRGA_12(y, X, Z, lambda, psi, sigma.sq, max.iter)
+  BVS_IRGA_12result <- BVS_IRGA_12(
+    y, X, Z, lambda, psi, sigma.sq, max.iter, estimator = estimator
+  )
   
   
   ## Step 3 of Algorithm 1:
@@ -149,7 +182,10 @@ BVS_IRGA <- function(y, X, Z, lambda, psi, sigma.sq = NULL, max.iter = 100) {
 
 # Computation of posterior inclusion probabilities (PIPs) using IRGA
 # with iid erros with variance `sigma.sq`, potentially unknown.
-PIP_IRGA <- function(y, A, lambda, psi, sigma.sq = NULL, p = NULL, max.iter = 100) {
+PIP_IRGA <- function(
+  y, A, lambda, psi, sigma.sq = NULL, p = NULL,
+  max.iter = 100, estimator = "VAMP"
+) {
   # `p` is the (maximum) length of beta in the executions of IRGA
   # `max.iter` is the maximum number of VAMP iterations before adding dampening.
   
@@ -186,6 +222,17 @@ PIP_IRGA <- function(y, A, lambda, psi, sigma.sq = NULL, p = NULL, max.iter = 10
       split_ind[n_splits+2-d] <- split_ind[n_splits+2-d] - diff + d - 1
   }
   
+  s <- 1
+    beta_ind <- (split_ind[s]+1):split_ind[s+1]
+  
+  BVS_IRGA(
+    y,
+    X = A[, beta_ind],
+    Z = A[, -beta_ind],
+    lambda, psi, sigma.sq, max.iter,
+    estimator = estimator
+  )
+  
   # Setup for parallel computing
   cl <- parallel::makeCluster(n_cores)
   doParallel::registerDoParallel(cl)
@@ -203,7 +250,8 @@ PIP_IRGA <- function(y, A, lambda, psi, sigma.sq = NULL, p = NULL, max.iter = 10
         y,
         X = A[, beta_ind],
         Z = A[, -beta_ind],
-        lambda, psi, sigma.sq, max.iter
+        lambda, psi, sigma.sq, max.iter,
+        estimator = estimator
       )
     }
   )
