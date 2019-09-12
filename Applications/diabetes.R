@@ -50,41 +50,28 @@ epEnd <- Sys.time()
 Gibbs_PIP <- PIP_Gibbs(y, X = A, lambda, psi, sigma.sq = NULL, iter = 1e5, MCerror = TRUE)
 
 
+log_odds <- function(PIP) log(PIP) - log(1-PIP)
+Gibbs_log_odds <- log_odds(Gibbs_PIP)
+IRGA_log_odds <- log_odds(IRGA_PIP)
+IRGA_lasso_log_odds <- log_odds(IRGA_lasso_PIP)
+VB_log_odds <- log_odds(VB_PIP)
+EP_log_odds <- log_odds(EP_PIP)
 
-cat("IRGA absolute difference in posterior inclusion probability:")
-summary(abs(Gibbs_PIP - IRGA_PIP))
+
+cat("IRGA absolute difference in posterior log odds of inclusion:")
+summary(abs(Gibbs_log_odds - IRGA_log_odds))
 print(irgaEnd - irgaStart)
 
-cat("IRGA with lasso absolute difference in posterior inclusion probability:")
-summary(abs(Gibbs_PIP - IRGA_lasso_PIP))
+cat("IRGA with lasso absolute difference in posterior log odds of inclusion:")
+summary(abs(Gibbs_log_odds - IRGA_lasso_log_odds))
 print(irga_lassoEnd - irga_lassoStart)
 
-cat("VB absolute difference in posterior inclusion probability:")
-summary(abs(Gibbs_PIP - VB_PIP))
+cat("VB absolute difference in posterior log odds of inclusion:")
+summary(abs(Gibbs_log_odds - VB_log_odds))
 print(vbEnd - vbStart)
 
-summary(abs(Gibbs_PIP - Ormerod_PIP))
+summary(abs(Gibbs_log_odds - Ormerod_log_odds))
 
-cat("EP absolute difference in posterior inclusion probability:")
-summary(abs(Gibbs_PIP - EP_PIP))
+cat("EP absolute difference in posterior log odds of inclusion:")
+summary(abs(Gibbs_log_odds - EP_log_odds))
 print(epEnd - epStart)
-
-
-## Plot the results
-ymax <- .4
-colGibbs= rgb(0,0,0,alpha=.5) 
-colVB= rgb(0,0,0,alpha=.7)
-
-pdf("application_diabetes.pdf", width = 5.5, height = 2)
-par(mfrow = c(1,1), bty = 'l',
-    cex = .5)
-ylab <- "Error in PIP"
-plot(x = 1:64-.25, y = abs(IRGA_PIP - Gibbs_PIP), type = 'h', cex = .6, ylim = c(0, ymax), xlim = c(1, p), ylab = "Difference in PIP", xlab = "Predictor")
-lines(x = 1:64, y = abs(EP_PIP - Gibbs_PIP), type = 'h', col = colGibbs, cex = .7)
-lines(x = 1:64+.25, y = abs(VB_PIP - Gibbs_PIP), type = 'h', col = colVB, cex = .7)
-
-points(x = 1:64-.25, y = abs(IRGA_PIP - Gibbs_PIP), pch = 4, cex = .3)
-points(x = 1:64, y = abs(EP_PIP - Gibbs_PIP), pch = 16, col = colGibbs, cex = .5)
-points(x = 1:64+.25, y = abs(VB_PIP - Gibbs_PIP), pch = 17, col = colVB, cex = .5)
-
-dev.off()

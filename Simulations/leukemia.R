@@ -70,23 +70,30 @@ for(j in 1:n.rep) {
 }
 
 
+# We cap the log odds since the approximate PIP can equal 1.
+log_odds <- function(PIP) pmin(as.vector(log(PIP) - log(1-PIP)), 50)
+Gibbs_log_odds <- log_odds(Gibbs_PIP)
+IRGA_log_odds <- log_odds(IRGA_PIP)
+VB_log_odds <- log_odds(VB_PIP)
+EP_log_odds <- log_odds(EP_PIP)
 
-IRGA_error <- as.vector(abs(Gibbs_PIP - IRGA_PIP))
 
-cat("IRGA absolute difference in posterior inclusion probability:")
+IRGA_error <- abs(Gibbs_log_odds - IRGA_log_odds)
+
+cat("IRGA absolute difference in posterior log odds of inclusion:")
 summary(IRGA_error)
 summary(IRGA_time)
 
 
-VB_error <- as.vector(abs(Gibbs_PIP - VB_PIP))
+VB_error <- abs(Gibbs_log_odds - VB_log_odds)
 
-cat("VB absolute difference in posterior inclusion probability:")
+cat("VB absolute difference in posterior log odds of inclusion:")
 summary(VB_error)
 summary(VB_time)
 
 
-EP_error <- as.vector(abs(Gibbs_PIP - EP_PIP))
+EP_error <- abs(Gibbs_log_odds - EP_log_odds)
 
-cat("EP absolute difference in posterior inclusion probability:")
+cat("EP absolute difference in posterior log odds of inclusion:")
 summary(EP_error)
 summary(EP_time)
