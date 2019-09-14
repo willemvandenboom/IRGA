@@ -11,7 +11,7 @@ Repository with the code used for the manuscript in preparation titled "Approxim
 
 * [`epBVS.R`](epBVS.R) contains code for Bayesian variable selection using expectation propagation by José Miguel Hernández-Lobato downloaded from [Bitbucket](https://bitbucket.org/jmh233/ep-lrmssp/src/e85e3170757ec1a4c6032c0aeca22b0ee57a6c67/methods/ep/epBVS.R?at=default&fileviewer=file-view-default).
 
-* [`setup.R`](setup.R) sets up the R environment for the [Applications] and [Simulations]. It loads [`BVS_IRGA.R`](BVS_IRGA.R) and [`BVS_other.R`](BVS_other.R) which should thus be present in the working directory.
+* [`setup.R`](setup.R) sets up the R environment for the [Applications](Applications) and [Simulations](Simulations). It loads [`BVS_IRGA.R`](BVS_IRGA.R) and [`BVS_other.R`](BVS_other.R) which should thus be present in the working directory.
 
 * [`VAMP.R`](VAMP.R) implements vector approximate message passing (VAMP).
 
