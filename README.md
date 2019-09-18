@@ -1,6 +1,6 @@
 # IRGA
 
-Repository with the code used for the manuscript in preparation titled "Approximating high-dimensional posteriors with nuisance parameters via integrated rotated Gaussian approximation".
+Repository with the code used for "Approximating high-dimensional posteriors with nuisance parameters via integrated rotated Gaussian approximation" ([arXiv:1909.06753](https://arxiv.org/abs/1909.06753)).
 
 
 ## Description of files
