@@ -65,11 +65,11 @@ Q <- qr.Q(qr(X), complete=TRUE)
 
 # Compute the rotated quantities
 QtY <- as.vector(crossprod(Q, y))
-RtY <- QtY[1:p]
+MtY <- QtY[1:p]
 
-RtX <- crossprod(Q[,1:p, drop=FALSE], X)
+MtX <- crossprod(Q[,1:p, drop=FALSE], X)
 
-R <- Q[, 1:p]
+M <- Q[, 1:p]
 S <- Q[, -(1:p)]
 StY <- QtY[-(1:p)]
 
@@ -111,18 +111,18 @@ cat('Stopped iterative scheme after', t, 'iterations.\n')
 # Estimate the mean and covariance for the Gaussian approximation via simple Monte Carlo
 # from the approximate P(eta | StY) = P(G(F) | StY).
 eta.samples <- g(mvtnorm::rmvnorm(n = 1e3, mean = m, sigma = (Sigma.star + t(Sigma.star))/2))
-Rt_eta.samples <- eta.samples %*% R
+Mt_eta.samples <- eta.samples %*% M
 
 
-Gauss_mean <- colMeans(Rt_eta.samples)
-Gauss_covariance <- cov(Rt_eta.samples)
+Gauss_mean <- colMeans(Mt_eta.samples)
+Gauss_covariance <- cov(Mt_eta.samples)
 
 
 ## Step 3
 # Compute the posterior mean and covariance for beta
 tmp <- solve(Gauss_covariance + sigma.sq*diag(p))
-IRGA_cov <- solve(crossprod(RtX, tmp%*%RtX) + diag(p)/psi)
-IRGA_mean <- IRGA_cov%*%crossprod(RtX, tmp%*%(RtY - Gauss_mean))
+IRGA_cov <- solve(crossprod(MtX, tmp%*%MtX) + diag(p)/psi)
+IRGA_mean <- IRGA_cov%*%crossprod(MtX, tmp%*%(MtY - Gauss_mean))
 
 
 irgaEnd <- Sys.time()

@@ -24,11 +24,11 @@ lambda <- p/r
 IRGA_PIP <- array(NA_real_, dim = c(n.rep, r))
 IRGA_time <- array(NA_real_, dim = c(n.rep))
 
-VB_PIP <- array(NA_real_, dim = c(n.rep, r))
-VB_time <- array(NA_real_, dim = c(n.rep))
-
 EP_PIP <- array(NA_real_, dim = c(n.rep, r))
 EP_time <- array(NA_real_, dim = c(n.rep))
+
+VB_PIP <- array(NA_real_, dim = c(n.rep, r))
+VB_time <- array(NA_real_, dim = c(n.rep))
 
 Gibbs_PIP <- array(NA_real_, dim = c(n.rep, r))
 
@@ -47,7 +47,7 @@ for(j in 1:n.rep) {
   
   ## IRGA
   irgaStart <- Sys.time()
-  IRGA_PIP[j,]  <- PIP_IRGA(y, A, lambda, psi, sigma.sq)
+  IRGA_PIP[j,]  <- PIP_IRGA(y, A, lambda, psi, sigma.sq, theta_split = "sequential")
   
   # Record computation time
   IRGA_time[j] <- as.numeric(Sys.time() - irgaStart, unit = 'secs')
@@ -74,8 +74,8 @@ for(j in 1:n.rep) {
 log_odds <- function(PIP) pmin(as.vector(log(PIP) - log(1-PIP)), 50)
 Gibbs_log_odds <- log_odds(Gibbs_PIP)
 IRGA_log_odds <- log_odds(IRGA_PIP)
-VB_log_odds <- log_odds(VB_PIP)
 EP_log_odds <- log_odds(EP_PIP)
+VB_log_odds <- log_odds(VB_PIP)
 
 
 IRGA_error <- abs(Gibbs_log_odds - IRGA_log_odds)
@@ -85,15 +85,15 @@ summary(IRGA_error)
 summary(IRGA_time)
 
 
-VB_error <- abs(Gibbs_log_odds - VB_log_odds)
-
-cat("VB absolute difference in posterior log odds of inclusion:")
-summary(VB_error)
-summary(VB_time)
-
-
 EP_error <- abs(Gibbs_log_odds - EP_log_odds)
 
 cat("EP absolute difference in posterior log odds of inclusion:")
 summary(EP_error)
 summary(EP_time)
+
+
+VB_error <- abs(Gibbs_log_odds - VB_log_odds)
+
+cat("VB absolute difference in posterior log odds of inclusion:")
+summary(VB_error)
+summary(VB_time)

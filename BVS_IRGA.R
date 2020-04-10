@@ -78,12 +78,12 @@ BVS_IRGA_12 <- function(
   
   # Compute the rotated quantities
   QtY <- as.vector(crossprod(Q, y))
-  RtY <- QtY[1:p]
+  MtY <- QtY[1:p]
   
-  RtX <- crossprod(Q[,1:p, drop=FALSE], X)
+  MtX <- crossprod(Q[,1:p, drop=FALSE], X)
   
   QtZ <- crossprod(Q, Z)
-  RtZ <- QtZ[1:p,, drop=FALSE]
+  MtZ <- QtZ[1:p,, drop=FALSE]
   
   # If p equals the number of observations,
   # then the nuisance parameter eta follows its prior
@@ -94,9 +94,9 @@ BVS_IRGA_12 <- function(
     )
     
     # The prior variance of alpha is lambda * psi * I_q
-    covariance <- lambda * psi * tcrossprod(RtZ)
+    covariance <- lambda * psi * tcrossprod(MtZ)
     
-    return(list(RtY=RtY, RtX=RtX, mean=numeric(p), covariance=covariance, sigma.sq=sigma.sq))
+    return(list(MtY=MtY, MtX=MtX, mean=numeric(p), covariance=covariance, sigma.sq=sigma.sq))
   }
   
   StY <- QtY[-(1:p)]
@@ -118,8 +118,8 @@ BVS_IRGA_12 <- function(
       rho = rho, max.iter = max.iter,
       min.rho = min.rho, verbose = verbose
     )
-    mean <- RtZ %*% VAMPresult$mean
-    covariance <- VAMPresult$variance * tcrossprod(RtZ, RtZ)
+    mean <- MtZ %*% VAMPresult$mean
+    covariance <- VAMPresult$variance * tcrossprod(MtZ, MtZ)
     
     # If sigma.sq was unknown, it has been estimated by VAMP.
     sigma.sq <- VAMPresult$sigma.sq
@@ -130,7 +130,7 @@ BVS_IRGA_12 <- function(
     q <- NCOL(StZ)
     
     # Keep the largest lasso estimate which has less than lambda*q+1 nonzero coefficients.
-    lars.result <- coef(lars::lars(x=StZ, y=StY, type = "lasso", intercept = FALSE))
+    lars.result <- coef(lars::lars(x=StZ, y=StY, type = "lasso", intercept = FALSE, use.Gram = q <= n))
     alpha.lasso <- lars.result[max(which(rowSums(lars.result != 0) < lambda*q+1)),]
     
     lasso.u <- as.vector(alpha.lasso+t(StZ)%*%(StY-StZ%*%alpha.lasso)/(n-p))
@@ -143,12 +143,12 @@ BVS_IRGA_12 <- function(
     
     covariance <- sigma.sq*solve(Sigma.hat)/(n-p)
     
-    mean <- RtZ %*% mean
-    covariance <- tcrossprod(RtZ %*% covariance, RtZ)
+    mean <- MtZ %*% mean
+    covariance <- tcrossprod(MtZ %*% covariance, MtZ)
     
   }
   
-  return(list(RtY=RtY, RtX=RtX, mean=mean, covariance=covariance, sigma.sq=sigma.sq))
+  return(list(MtY=MtY, MtX=MtX, mean=mean, covariance=covariance, sigma.sq=sigma.sq))
 }
 
 
@@ -173,8 +173,8 @@ BVS_IRGA <- function(y, X, Z, lambda, psi, sigma.sq = NULL, max.iter = 100, esti
   ## Step 3 of Algorithm 1:
   # Compute the posterior inclusion probabilities (PIPs).
   return(PIP_exact(
-    y = BVS_IRGA_12result$RtY - BVS_IRGA_12result$mean,
-    X = BVS_IRGA_12result$RtX,
+    y = BVS_IRGA_12result$MtY - BVS_IRGA_12result$mean,
+    X = BVS_IRGA_12result$MtX,
     lambda, psi,
     # If sigma.sq was unknown, it has been estimated in Step 2.
     Sigma <- BVS_IRGA_12result$sigma.sq * diag(p) + BVS_IRGA_12result$covariance
@@ -183,24 +183,28 @@ BVS_IRGA <- function(y, X, Z, lambda, psi, sigma.sq = NULL, max.iter = 100, esti
 
 
 # Computation of posterior inclusion probabilities (PIPs) using IRGA
-# with iid erros with variance `sigma.sq`, potentially unknown.
+# with iid errors with variance `sigma.sq`, potentially unknown.
 PIP_IRGA <- function(
   y, A, lambda, psi, sigma.sq = NULL, p = NULL,
-  max.iter = 100, estimator = "VAMP"
+  max.iter = 100, estimator = "VAMP", theta_split = "sequential"
 ) {
   # `p` is the (maximum) length of beta in the executions of IRGA
   # `max.iter` is the maximum number of VAMP iterations before adding dampening.
+  # `theta_split` specifies how A is split into X and Z.
+  # The options are "sequential", "random", "spectral" and "belsley".
+  # The latter two group correlated predictors in X.
+  # "belsley" cannot be used if r > n.
   
   A <- as.matrix(A)
   r <- ncol(A) # Number of candidate variables
   y <- as.vector(y)
   
   # `n_splits` specifies the number of executions of IRGA
-  if(is.null(p)) {
+  if (is.null(p)) {
     
     # p = O(log(r)) yields a favorable computational complexity.
     p = floor(log(r))
-    n_splits <- ceiling(r/p)
+    n_splits <- ceiling(r / p)
     
     # To make best use of compute power,
     # the number of splits should not be less than the number of CPU cores.
@@ -211,47 +215,144 @@ PIP_IRGA <- function(
     n_splits <- max(r %/% length(y), n_splits)
     
   } else {
-    if(p > n) stop('p>n such that IRGA does not apply.')
-    n_splits <- ceiling(r/p)
+    if (p > n) stop("p>n such that IRGA does not apply.")
+    n_splits <- ceiling(r / p)
   }
   
-  # Compute the start and end indices of the splits
-  split_ind <- 0:n_splits * ceiling(r/n_splits)
+  # Compute the size of each split.
+  split_size <- rep(ceiling(r / n_splits), n_splits)
   
   # If r %% n_splits != 0, we need to make the splits of unequal size.
-  diff <- split_ind[n_splits+1] - r
-  if(diff > 0) for(d in 1:diff) {
-      split_ind[n_splits+2-d] <- split_ind[n_splits+2-d] - diff + d - 1
+  diff <- sum(split_size) - r
+  if (diff > 0) split_size[n_splits - 0:(diff - 1)] <- split_size[n_splits - 0:(diff - 1)] - 1
+  
+  theta_split <- match.arg(tolower(theta_split), c("sequential", "random", "spectral", "belsley"))
+  
+  # List to store the column numbers of A constituting each beta
+  beta_ind <- list()
+  
+  if (theta_split == "sequential") {
+    
+    for (s in 1:n_splits) beta_ind[[s]] <- sum(split_size[seq_len(s - 1)]) + 1:split_size[s]
+    
+  } else if (theta_split == "random") {
+    
+    tmp <- sample.int(n = r)
+    for (s in 1:n_splits) beta_ind[[s]] <- tmp[sum(split_size[seq_len(s - 1)]) + 1:split_size[s]]
+    
+  } else if (theta_split == "spectral") {
+    
+    # Spectral clustering
+    
+    # Create the similarity matrix.
+    W <- diag(r)
+    for (i in 2:r) for (j in 1:(i - 1)) W[i, j] <- cor(A[, i], A[, j])
+    W <- abs(W)
+    W <- W + t(W)
+    
+    # Compute the Laplacian matrix.
+    L <- diag(colSums(W)) - W
+    
+    U <- eigen(x = L, symmetric = TRUE)$vectors[, (r - n_splits):(r - 1)]
+    
+    # Need to ensure that the clusters have equal size.
+    # We first run k-means:
+    tmp <- kmeans(x = U, centers = n_splits, iter.max = 100)
+    cluster_centers <- tmp$centers
+    
+    # Then, we assign "surplus" of the largest cluster to the closest clusters:
+    
+    # `theta_cluster` is a factor to ensure also empty clusters are included in the output of `table`.
+    theta_cluster <- as.factor(tmp$cluster)
+    
+    # Vector to keep track of which clusters have already been done
+    cluster_done <- logical(n_splits)
+    
+    for (s in 1:n_splits) {
+      
+      if (s == 1) {
+        cluster_table <- table(theta_cluster)
+      } else {
+        # We do not consider the clusters that we already reduced to the correct size.
+        cluster_table <- table(theta_cluster[-unlist(beta_ind)])
+      }
+      
+      cluster_index <- which.max(cluster_table)
+      theta_ind <- which(theta_cluster == cluster_index)
+      cluster_size <- cluster_table[cluster_index]
+      
+      # If the largest cluster is small enough, then we are done.
+      if (cluster_size <= split_size[1]) {
+        for (cl in which(!cluster_done)) {
+          beta_ind[[s]] <- which(theta_cluster == cl)
+          s <- s+1
+        }
+        break
+      }
+      
+      # Compute the distance to the center for each point in the largest cluster.
+      distance <- numeric(cluster_size)
+      for (i in 1:cluster_size) distance[i] <- sum((U[theta_ind[i], ] - cluster_centers[cluster_index, ])^2)
+      
+      # Find the `split_size[1]` smallest distances.
+      tmp <- order(distance)[1:split_size[1]]
+      
+      # The points corresponding to these smallest distances remain in the cluster.
+      beta_ind[[s]] <- theta_ind[tmp]
+      cluster_done[cluster_index] <- TRUE
+      
+      # The other points are assigned to the closest remaining clusters.
+      theta_ind <- theta_ind[-tmp]
+      
+      # Vector to keep track of minimum distance
+      min_distance <- rep(Inf, cluster_size - split_size[1])
+      
+      for (cl in which(!cluster_done)) for (i in 1:(cluster_size - split_size[1])) {
+        
+        tmp <- sum((U[theta_ind[i], ] - cluster_centers[cl, ])^2)
+        
+        if (tmp < min_distance[i]) {
+          min_distance[i] <- tmp
+          theta_cluster[theta_ind[i]] <- cl
+        }
+        
+      }
+      
+    }
+    
+  } else { # theta_split == "belsley"
+    
+    if (r > n) stop("`theta_split = 'belsley'` cannot be used if `r > n`.")
+    
+    # Cluster collinear predictors based on Section 3.2 from
+    # "Regression Diagnostics: Identifying Influential Data and Sources of Collinearity"
+    # by David A. Belsley, Edwin Kuh, and Roy E. Welsch (1980).
+    tmp <- svd(x = A, nu = 0, nv = r)
+    phi <- tmp$v^2 %*% diag(1 / tmp$d^2)
+    pi_mat <- t(diag(1 / rowSums(phi)) %*% phi)
+    
+    for (s in 1:n_splits) {
+      beta_ind[[s]] <- order(pi_mat[s, ], decreasing = TRUE)[1:split_size[s]]
+      pi_mat[, beta_ind[[s]]] <- NA
+    }
+    
   }
-  
-  s <- 1
-    beta_ind <- (split_ind[s]+1):split_ind[s+1]
-  
-  BVS_IRGA(
-    y,
-    X = A[, beta_ind],
-    Z = A[, -beta_ind],
-    lambda, psi, sigma.sq, max.iter,
-    estimator = estimator
-  )
   
   # Setup for parallel computing
   cl <- parallel::makeCluster(n_cores)
   doParallel::registerDoParallel(cl)
   
   # Compute the PIPs using IRGA and parallel computing.
-  PIP <- foreach::`%dopar%`(
+  PIP_list <- foreach::`%dopar%`(
     foreach::foreach(
-      s=1:n_splits, .combine='c',
+      s=1:n_splits,
       .export = c('BVS_IRGA', 'BVS_IRGA_12', 'PIP_exact')
     ),
     {
-      beta_ind <- (split_ind[s]+1):split_ind[s+1]
-      
       BVS_IRGA(
         y,
-        X = A[, beta_ind],
-        Z = A[, -beta_ind],
+        X = A[, beta_ind[[s]]],
+        Z = A[, -beta_ind[[s]]],
         lambda, psi, sigma.sq, max.iter,
         estimator = estimator
       )
@@ -259,6 +360,9 @@ PIP_IRGA <- function(
   )
   
   parallel::stopCluster(cl)
+  
+  PIP <- numeric(r)
+  for (s in 1:n_splits) PIP[beta_ind[[s]]] <- PIP_list[[s]]
   
   return(PIP)
 }

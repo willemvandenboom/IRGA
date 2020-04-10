@@ -22,11 +22,11 @@ sigma.sq <- .5
 IRGA_error <- array(NA_real_, dim = c(n.q, n.rep, 2))
 IRGA_time <- array(NA_real_, dim = c(n.q, n.rep))
 
-VB_error <- array(NA_real_, dim = c(n.q, n.rep, 2))
-VB_time <- array(NA_real_, dim = c(n.q, n.rep))
-
 EP_error <- array(NA_real_, dim = c(n.q, n.rep, 2))
 EP_time <- array(NA_real_, dim = c(n.q, n.rep))
+
+VB_error <- array(NA_real_, dim = c(n.q, n.rep, 2))
+VB_time <- array(NA_real_, dim = c(n.q, n.rep))
 
 Ormerod_error <- array(NA_real_, dim = c(n.q, n.rep, 2))
 

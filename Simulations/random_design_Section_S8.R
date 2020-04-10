@@ -13,7 +13,7 @@ r.max <- max(r.list)
 psi <- 1
 sigma.sq <- .5
 n <- 100
-p <- 40
+n_nonzero <- 40
 
 
 IRGA_PIP <- array(NA_real_, dim = c(n.r, n.rep, r.max))
@@ -35,13 +35,13 @@ for(i in 1:n.r) for(j in 1:n.rep) {
   
   r <- r.list[i]
   
-  lambda <- p/r
+  lambda <- n_nonzero/r
   
   A <- matrix(rnorm(n*r), nrow = n, ncol = r)
   A <- scale(A)
   
   theta <- rep(0, r)
-  theta[sample.int(n = r, size = p)] <- rnorm(n = p, sd = sqrt(psi))
+  theta[sample.int(n = r, size = n_nonzero)] <- rnorm(n = n_nonzero, sd = sqrt(psi))
   y <- rnorm(n = n, mean = A%*%theta, sd = sqrt(sigma.sq))
   
   
@@ -50,7 +50,7 @@ for(i in 1:n.r) for(j in 1:n.rep) {
   
   ## IRGA
   irgaStart <- Sys.time()
-  IRGA_PIP[i,j,1:r]  <- PIP_IRGA(y, A, lambda, psi, sigma.sq, p = 1)
+  IRGA_PIP[i,j,1:r]  <- PIP_IRGA(y, A, lambda, psi, sigma.sq)
   
   # Record computation time
   IRGA_time[i,j] <- as.numeric(Sys.time() - irgaStart, unit = 'secs')
@@ -59,15 +59,15 @@ for(i in 1:n.r) for(j in 1:n.rep) {
   ## EP
   epStart <- Sys.time()
   EP_PIP[i,j,1:r] <- PIP_EP(y, X = A, lambda, psi, sigma.sq)
-
+  
   # Record computation time
   EP_time[i,j] <- as.numeric(Sys.time() - epStart, unit = 'secs')
-
-
+  
+  
   ## VB
   vbStart <- Sys.time()
   VB_PIP[i,j,1:r] <- PIP_VB(y, X = A, lambda, psi, sigma.sq)
-
+  
   # Record computation time
   VB_time[i,j] <- as.numeric(Sys.time() - vbStart, unit = 'secs')
   
