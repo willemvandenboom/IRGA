@@ -1,6 +1,6 @@
 # IRGA
 
-Repository with the code used for "Approximating high-dimensional posteriors with nuisance parameters via integrated rotated Gaussian approximation" ([arXiv:1909.06753](https://arxiv.org/abs/1909.06753)).
+Repository with the code used for "Approximating high-dimensional posteriors with nuisance parameters via integrated rotated Gaussian approximation" ([arXiv:1909.06753](https://arxiv.org/abs/1909.06753) and [doi:10.1093/biomet/asaa068](https://academic.oup.com/biomet/advance-article/doi/10.1093/biomet/asaa068/5897408?guestAccessKey=1e212b64-9972-4de9-9cd2-7c167b761fa3)).
 
 
 ## Description of files
